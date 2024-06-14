@@ -59,3 +59,13 @@ These commands search the entire filesystem (**/**) for files (**-type f**) with
     /tmp/sh
     ```
   This opens a shell with elevated privileges.
+
+#### SGID Binaries
+
+- ```newgrp```
+  The newgrp command can be used to change the current group ID during a login session. If it has the SGID bit set, it can be used to escalate privileges:
+
+    ```newgrp <groupname>```
+
+- ```passwd```
+  The ```passwd``` command often has the SGID bit set to allow users to change their passwords. If misconfigured, it can be exploited.
