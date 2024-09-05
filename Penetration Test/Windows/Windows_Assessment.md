@@ -107,6 +107,7 @@
 - #### Display all network interface configurations
   ```
   ipconfig /all
+  Get-NetAdapter
   ```
 
 - #### List routing table
@@ -118,6 +119,18 @@
   ```
   netstat -ano
   ```
+
+#### List Open Ports
+- #### Show open TCP and UDP ports
+  ```
+  netstat -an
+  ```
+
+- #### Show open TCP and UDP ports (Powershell)
+  ```
+  Get-NetTCPConnection | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State
+  ```
+
 
 #### Network Shares
 - #### List shared resources on the system
@@ -192,6 +205,18 @@
   ```
   Get-WmiObject Win32_Process | Select-Object ProcessId, Name, @{Name="UserName";Expression={$_.GetOwner().User}}
   ```
+
+#### Check for High Privileged Processes
+- #### List all processes running as "SYSTEM"
+  ```
+  Get-WmiObject Win32_Process | Where-Object { $_.GetOwner().User -eq 'SYSTEM' }
+  ```
+
+#### Dump Process Memory (If Permissioned)
+- #### Dump process memory for analysis
+  ```
+  procdump -ma <PID> dumpfile.dmp
+  ```
 ------------------------------------------------------------------------------------------------------------
 
 ### Scheduled Tasks Enumeration
@@ -207,7 +232,7 @@
 -------------------------------------------------------------------------------------------------------------
 
 ### Password Policy and Security Settings
-- ### Show password policy
+- #### Show password policy
   ```
   net accounts
   ```
@@ -221,6 +246,12 @@
   ```
   Get-LocalUser | Select-Object Name, PasswordLastSet, PasswordExpires
   ```
+
+#### Audit Policy
+- #### Show the current audit policy (useful for detecting if logs are being created)
+  ```
+  auditpol /get /category:*
+  ```
 -------------------------------------------------------------------------------------------------------------
 
 ### File and Directory Enumeration
@@ -228,7 +259,25 @@
   ```
   dir C:\path\to\directory /s /b
   ```
+#### Search for Files Containing Passwords or Secrets
+- #### Find files with "password" in the filename
+  ```
+  dir C:\ /s /b | findstr /i "password"
+  ```
+
+- #### Search for files with extensions commonly used for configuration, credentials, etc
+  ```
+  dir C:\*.config /s /b
+  dir C:\*.xml /s /b
+  dir C:\*.txt /s /b
+  dir C:\*.ini /s /b
+  ```
   
+- #### PowerShell recursive file search for strings (useful for searching sensitive info in files)
+  ```
+  Get-ChildItem -Path C:\ -Recurse -Include *.txt, *.xml, *.config | Select-String -Pattern "password"
+  ```
+
 - #### List hidden files
   ```
   dir /a:h
@@ -238,6 +287,13 @@
   ```
   Get-Acl -Path "C:\path\to\directory"
   ```
+
+#### Find Files Owned by Specific Users (e.g., SYSTEM)
+- #### Recursively find all files owned by SYSTEM
+  ```
+  Get-ChildItem -Path C:\ -Recurse | Where-Object { (Get-Acl $_.FullName).Owner -eq 'NT AUTHORITY\SYSTEM' }
+  ```
+  
 ----------------------------------------------------------------------------------------
 
 ### Registry Enumeration
@@ -272,6 +328,13 @@
   ```
   Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" | Select-Object ConsentPromptBehaviorAdmin
   ```
+
+#### List Privileges of Current User
+- #### Check the privileges of the current user
+  ```
+  whoami /priv
+  ```
+  
 --------------------------------------------------------------------------------------------------
 
 ### Remote Access Enumeration
@@ -303,4 +366,38 @@
   ```
   gpresult /r
   ```
-    
+
+- #### Get domain controllers
+  ```
+  net group "Domain Controllers" /domain
+  ```
+-----------------------------------------------------------------------------------------------
+
+### Windows Registry Enumeration
+
+#### Check for Startup Programs in Registry
+- #### Get all programs that start at system boot
+  ```
+  Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run"
+  ```
+
+#### Check for Potentially Interesting Keys
+- #### Look for credentials stored in registry (sometimes stored by certain programs)
+  ```
+  Get-ItemProperty -Path "HKCU:\Software\Microsoft\Credentials"
+  ```
+-------------------------------------------------------------------------------------------
+
+### Windows Defender and AV Enumeration
+
+#### Check Windows Defender Status
+- #### Check if Windows Defender is enabled
+  ```
+  Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled
+  ```
+
+#### Disable Windows Defender (If Permissions Allow)
+- #### Disable Windows Defender (requires elevated permissions)
+  ```
+  Set-MpPreference -DisableRealtimeMonitoring $true
+  ```
