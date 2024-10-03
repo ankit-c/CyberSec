@@ -1,6 +1,4 @@
-## Tools of the Trade
-
-Many of the module sections require tools such as open-source scripts or precompiled binaries. Where applicable, these can be found in the `C:\Tools` directory on the Windows hosts provided in the sections aimed at attacking from Windows. In sections that focus on attacking AD from Linux we provide a Parrot Linux host customized for the target environment as if you were an anonymous user with an attack box within the internal network. All necessary tools and scripts will be preloaded on this host.  Here is a listing of many of the tools that we will cover in this module:
+# Tools of the Trade
   
 | Tool              | Description |  
 | ----------------- | ----------- |  
