@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+
+  # ============================================================
+  # SAML 2.0 Identity Provider (Signs assertions with RSA-SHA256)
+  # ============================================================
+  saml-idp:
+    build:
+      context: ./services/saml-idp
+      dockerfile: Dockerfile
+    container_name: sso-lab-saml-idp
+    hostname: saml-idp
+    ports:
+      - "8080:8080"
+    environment:
+      - IDP_BASE_URL=http://saml-idp:8080
+      - SECRET_KEY=idp-secret-lab-key
+      - FLASK_ENV=development
+    networks:
+      sso-lab:
+        ipv4_address: 172.30.0.10
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # Vulnerable SAML Service Provider
+  # Labs: XSW, Sig Bypass, Replay Attack
+  # ============================================================
+  vulnerable-saml-sp:
+    build:
+      context: ./services/vulnerable-saml-sp
+      dockerfile: Dockerfile
+    container_name: sso-lab-saml-sp
+    hostname: vulnerable-saml-sp
+    ports:
+      - "3000:3000"
+    environment:
+      # Internal URL  → container-to-container (cert fetch, etc.)
+      - IDP_BASE_URL=http://saml-idp:8080
+      # Browser URL   → what YOUR browser is redirected to (always localhost)
+      - IDP_BROWSER_URL=http://localhost:8080
+      - SP_BASE_URL=http://localhost:3000
+      - SECRET_KEY=sp-secret-lab-key
+      - FLASK_ENV=development
+    networks:
+      sso-lab:
+        ipv4_address: 172.30.0.20
+    depends_on:
+      saml-idp:
+        condition: service_healthy
+
+  # ============================================================
+  # OAuth 2.0 / OpenID Connect Authorization Server
+  # Issues JWT tokens, supports JWKS, configurable vulns
+  # ============================================================
+  oauth-server:
+    build:
+      context: ./services/oauth-server
+      dockerfile: Dockerfile
+    container_name: sso-lab-oauth-server
+    hostname: oauth-server
+    ports:
+      - "4000:4000"
+    environment:
+      - SERVER_BASE_URL=http://oauth-server:4000
+      - SECRET_KEY=oauth-server-secret
+      - FLASK_ENV=development
+      - VULN_ALLOW_ANY_REDIRECT=true
+      - VULN_SKIP_STATE_CHECK=true
+      - VULN_ACCEPT_NONE_ALG=true
+    networks:
+      sso-lab:
+        ipv4_address: 172.30.0.30
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # Vulnerable OAuth 2.0 / OIDC Client Application
+  # Labs: CSRF, Redirect URI bypass, JWT alg:none, Email Trust
+  # ============================================================
+  vulnerable-oauth-client:
+    build:
+      context: ./services/vulnerable-oauth-client
+      dockerfile: Dockerfile
+    container_name: sso-lab-oauth-client
+    hostname: vulnerable-oauth-client
+    ports:
+      - "5000:5000"
+    environment:
+      # Internal URL  → container-to-container (token exchange, userinfo, JWKS)
+      - OAUTH_SERVER_URL=http://oauth-server:4000
+      # Browser URL   → what YOUR browser is redirected to (always localhost)
+      - OAUTH_BROWSER_URL=http://localhost:4000
+      - CLIENT_ID=vulnerable-client
+      - CLIENT_SECRET=client-secret-abc123
+      - APP_BASE_URL=http://localhost:5000
+      - SECRET_KEY=client-app-secret
+      - FLASK_ENV=development
+    networks:
+      sso-lab:
+        ipv4_address: 172.30.0.40
+    depends_on:
+      oauth-server:
+        condition: service_healthy
+
+networks:
+  sso-lab:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
